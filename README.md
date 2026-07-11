@@ -1,100 +1,105 @@
-# Grokking Arc: erank as an Order Parameter and Training Stop Signal
+# Grokking Arc: Finding Generalization Without a Validation Set
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**erank（激活矩阵有效秩）能够在 grokking 发生前检测到相变，并在最优泛化点给出停止信号——不需要验证集，不需要看 loss。**
+**When a neural network "grokks" — suddenly generalizing long after memorizing the training set — its hidden representations undergo a measurable collapse. We call the metric that captures this `erank`, and we show that its trajectory forms a predictable arc whose bottom signals the optimal moment to stop training — no validation set needed.**
+
+## What is erank?
+
+`erank` (effective rank) measures how many independent directions a model's hidden representation spans. Given an activation matrix `H [N × d]` from the first hidden layer, we compute its singular values `σ₁ ≥ σ₂ ≥ ...` and define:
+
+```
+pᵢ = σᵢ / Σⱼ σⱼ
+erank = exp(-Σᵢ pᵢ · log pᵢ)
+```
+
+- **erank ≈ hidden_dim**: the model treats every sample independently (memorization)
+- **erank ≪ hidden_dim**: the model discovers a low-dimensional structure (generalization)
+
+It takes one line of PyTorch:
+```python
+U, S, V = torch.linalg.svd(H.float(), full_matrices=False)
+erank = torch.exp(-(S/S.sum() * torch.log(S/S.sum()+1e-10)).sum()).item()
+```
 
 ## Core Finding
 
-在带标签噪声的模加法任务上训练 MLP，erank 的轨迹呈现**弧形结构**：先骤降（记忆参数被 wd 清空，算法表示浮现），后回升（噪声样本缓慢再生记忆参数）。弧底 = 模型最紧凑且泛化最好的时刻。
+On a controlled modular arithmetic task with injected label noise, erank traces an **arc**: it plunges as weight decay clears memorized patterns, then slowly rises as noise regenerates them. **The bottom of the arc is where the model generalizes best.**
 
-### Grokking Trajectory (noise=0)
+### 1. Grokking Trajectory
 
-![grokking trajectory](figures/grok_traj_wd05.png)
+![grokking](figures/grok_traj_wd05.png)
 
-wd=0.5 下 erank 从 138 降到 60。wd=0.0 下纹丝不动。
+Color code: **blue** = compression score (1/erank, higher = more compressed), **red** = test accuracy. With weight decay (wd=0.5), compression tracks generalization perfectly — both jump together. Without it (wd=0.0), nothing moves.
 
-### Arc Discovery (noise=0.1)
+### 2. The Arc — Universality Across Noise Levels
 
-![arc discovery](figures/arc_discovery.png)
+![universality](figures/universality.png)
 
-噪声=0.1 下，wd=2.0 首次出现弧形——erank 先降后升。wd=0.1-1.0 过滤不足，wd=3.0 压死一切。
+Four panels, same MLP architecture, same task, same metric:
 
-### Arc Window (noise=0 vs noise=0.2)
+| Panel | Noise | Arc? | Best wd | Peak Accuracy |
+|-------|-------|------|---------|---------------|
+| A | 0% | No (monotonic) | 0.3 | 100% |
+| B | 10% | **Yes** | 2.0–2.2 | 94.7% |
+| C | 20% | **Yes** (narrow window) | 2.0–2.2 | 94.7% |
+| D | 40% | **No** (window closed) | — | 30% |
 
-![arc window](figures/arc_window.png)
+Orange curves = arc region. Gray = under-decayed (no compression). Red = over-decayed (collapsed). **The arc is not a fluke — it appears at every noise level where grokking is possible, and disappears precisely when grokking becomes impossible.**
 
-左：noise=0，无弧（单调解降）。右：noise=0.2，弧形窗口极窄，只有 wd≈2.2 产生弧。
+### 3. Compression vs Noise
 
-### Noise Scan
+![noise](figures/noise_scan.png)
 
-![noise scan](figures/noise_scan.png)
+As label noise increases, the model's compression ability collapses — not gradually, but through a window that snaps shut between 20% and 40% noise.
 
-erank 在 noise=0 时从 138 降为 59，noise=0.1 时停在 119，noise≥0.2 时无法 grok。
+## Why This Works: Mechanism
 
-## Key Results
+### Weight decay as a differential filter
 
-### 1. erank 是有效的非平衡序参量
-- Grokking 中从 138 降到 60（55% 压缩）
-- 与同期前沿（Wang 2026, ERI Labs 2026）独立收敛到秩作为序参量
+Every training step: `θ ← θ·(1-ηλ) - η·∇L`. Weight decay shrinks all parameters equally. But:
 
-### 2. 弧形理论
-- 噪声 > 0 时才出现弧（erank 先降后升）
-- 弧底 = 最佳泛化点（早停可多拿 4-6% acc）
-- 无噪声时只有单调解降 + 微弱的过衰减尾迹
+- **Algorithmic params** (encoding the addition rule): pushed by gradients from 500 clean samples every epoch → pushed back faster than decay
+- **Memorization params** (recalling specific samples): pushed by at most one sample → pure decay kills them
 
-### 3. 弧形窗口随噪声收窄
-| noise | arc window | peak acc |
-|-------|-----------|----------|
-| 0.0   | no arc (monotonic) | 100% |
-| 0.1   | wd 2.0-2.2 | 94.7% |
-| 0.2   | wd 2.0-2.2 (very narrow) | 94.7% |
-| 0.4   | window closed | 30% |
+No metaphors, just arithmetic. The parameters that survive are the ones with the broadest gradient support.
 
-### 4. Weight Decay as Differential Filter
-算法参数被多个干净样本共享 → 梯度密集推回 → 抵抗衰减。记忆参数只有专属样本偶尔推一次 → 纯衰减致死。噪声样本持续再生记忆参数 → 产生弧。
+### Noise creates the arc
+
+Clean data: decay clears noise-free memorization params. They stay dead. No arc — monotonic compression.
+
+Noisy data: decay clears memorization params → erank drops (algorithm emerges). But noise samples randomly push wrong labels → random walk regenerates ghost params → erank rises. **Arc = race between decay and random regeneration.**
 
 ## Quick Start
 
 ```bash
-pip install torch numpy
-python src/run.py --mode grok --device cuda           # grokking trajectory
-python src/run.py --mode arc --device cuda             # arc detection
-python src/run.py --mode noise --device cuda           # noise scan
+pip install torch numpy matplotlib
+python src/run.py --mode grok --device cuda    # grokking trajectory
+python src/run.py --mode arc --device cuda      # arc discovery scan
+python src/run.py --mode noise --device cuda    # noise scan
+python src/plot.py                              # regenerate figures
 ```
 
 ## Data
 
-`data/` 包含全部实验的完整轨迹：
+`data/` contains complete training trajectories with per-checkpoint erank:
 
 | File | Experiment |
 |------|-----------|
-| `grokking_trajectory.json` | Grokking 完整追踪 (20000 epochs, 401 snapshots) |
-| `noise_scan.json` | Noise 0.0-0.4 下 erank 分化 (固定 wd=0.5) |
-| `arc_discovery_noise01.json` | Noise=0.1 wd 扫描 —— **弧形首次发现** |
-| `arc_high_wd_noise01.json` | Noise=0.1 高 wd (2.0/3.0/5.0) 弧线对比 |
-| `arc_window_noise02.json` | Noise=0.2 wd 1.5-3.0 精细扫描 —— 窗口收窄 |
-| `arc_optimal_noise02.json` | Noise=0.2 wd 2.0-2.2 最优区间定位 |
-| `arc_broad_noise02.json` | Noise=0.2 wd 0.1-2.0 宽扫描 |
-| `arc_noise04_closed.json` | Noise=0.4 wd 扫描 —— **窗口已关闭** |
-| `dim_scaling.json` | Dim 32/64/128/256 标度实验 |
-| `dim256_long.json` | Dim=256 20000 epochs 长训练 |
-
-## Theory
-
-**Core mechanism, no deep metaphors needed:**
-
-1. **Cross-entropy degeneracy**: softmax gradient `∂L/∂f = p - 1_{correct}` never reverses sign. Without regularization, weights grow unboundedly.
-
-2. **Weight decay as differential filter**: `θ ← θ·(1-ηλ)`. Algorithmic params survive (many samples push back). Memorization params die (no pushback).
-
-3. **Noise as regeneration force**: noisy samples push random wrong directions → random walk interference ∝ √(noise·t). Clean signal grows ∝ (1-noise)·t. Their competition defines the arc.
-
-4. **Arc window**: exists only when `(1-ε)·g_clean > √(ε/t)·g_noise + λ`. Window closes at ε ≈ 0.3-0.4.
+| `grokking_trajectory.json` | Full grokking run (20000 epochs, 401 snapshots) |
+| `arc_discovery_noise01.json` | Noise=10% wd scan — **arc first discovered here** |
+| `arc_high_wd_noise01.json` | Noise=10% high wd (2.0/3.0/5.0) comparison |
+| `arc_window_noise02.json` | Noise=20% wd 1.5–3.0 — window narrowing |
+| `arc_optimal_noise02.json` | Noise=20% wd 2.0–2.2 — optimal point |
+| `arc_broad_noise02.json` | Noise=20% wd 0.1–2.0 broad scan |
+| `arc_noise04_closed.json` | Noise=40% wd scan — **window closed** |
+| `noise_scan.json` | Noise 0%–40% erank comparison |
+| `dim_scaling.json` | Width scaling (dim 32–256) |
+| `dim256_long.json` | Dim 256 long training (20000 epochs) |
 
 ## Reference
 
-Independent work converging on rank-based order parameters:
-- Wang (2026): *Grokking as Dimensional Phase Transition* — gradient field dimension D
-- ERI Labs (2026): *Fisher Rank Crystallization* — Fisher rank fraction r/n
-- DeMoss et al. (2024): *Complexity Dynamics of Grokking* — compression complexity
+Independent work converging on rank-based order parameters for grokking:
+- Wang (2026): *Grokking as Dimensional Phase Transition*
+- ERI Labs (2026): *Fisher Rank Crystallization*
+- DeMoss et al. (2024): *Complexity Dynamics of Grokking*
