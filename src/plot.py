@@ -11,22 +11,18 @@ def load(fn):
     with open(f'{DATA}/{fn}') as f: return json.load(f)
 
 # ============================================================
-# FIG 1: Grokking — wd=0.5 vs wd=0.0
+# FIG 1: Grokking — wd=0.5 vs wd=0.0, erank INVERTED
 # ============================================================
 d = load('grokking_trajectory.json')
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.5))
 for ax, key, title in [(ax1, 'wd_0.5', 'Grokking (wd=0.5)'), (ax2, 'wd_0.0', 'Memorization (wd=0.0)')]:
-    v = d[key]; ep = v['epoch']; ea = v['erank']; ta = v['test_acc']
-    ax.plot(ep, ea, 'b-', linewidth=1.2, label='erank')
-    ax2t = ax.twinx()
-    ax2t.plot(ep, ta, 'r-', linewidth=1.5, label='Test Acc')
-    ax.set_ylim(0, 160); ax2t.set_ylim(0, 1.05)
-    ax.set_xlabel('Epoch'); ax.set_ylabel('erank', color='b')
-    ax2t.set_ylabel('Test Accuracy', color='r')
+    v = d[key]; ep = v['epoch']; ea = [140 - e for e in v['erank']]; ta = v['test_acc']
+    ax.plot(ep, ea, 'b-', linewidth=1.2, label='140 - erank (inverted)')
+    ax.plot(ep, [t*140 for t in ta], 'r-', linewidth=1.5, alpha=0.6, label='Test Acc x140')
+    ax.set_ylim(0, 145)
+    ax.set_xlabel('Epoch'); ax.set_ylabel('Score')
     ax.set_title(title); ax.grid(True, alpha=0.2)
-    ax.annotate(f'{ea[0]:.0f}', xy=(ep[0],ea[0]), fontsize=9, color='b')
-    ax.annotate(f'{ea[-1]:.0f}', xy=(ep[-1],ea[-1]), fontsize=9, color='b',
-                xytext=(ep[-1]-1500, ea[-1]+8))
+    ax.legend(fontsize=8, loc='lower right')
 plt.suptitle('Fig 1: Grokking Trajectory (p=97, dim=128, 20000 epochs)', y=1.02)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig1_grokking.png', dpi=150); plt.close()
 
