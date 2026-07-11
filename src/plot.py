@@ -132,36 +132,37 @@ plt.suptitle('Fig 4: Same wd=0.5 Fails at Higher Noise', y=1.02, fontsize=12)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig4_noise_wd05.png', dpi=150); plt.close()
 
 # ============================================================
-# FIG 5: Three wd regimes — practical guide
+# FIG 5: Three wd regimes — with accuracy overlay
 # ============================================================
 d1 = load('arc_discovery_noise01.json')
 d2 = load('arc_high_wd_noise01.json')
 fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
+# Regime 1: too low
 ax=axes[0]
-for wd in ['0.1','0.3','0.5']:
-    v=d1[wd];inv=[140-e for e in v['erank']]
-    ax.plot(v['epoch'],inv,color='#888888',linewidth=1.2,label=f'wd={wd}')
-ax.set_title('wd too low: no compression');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
+v=d1['0.5']; ep=v['epoch']; inv=[140-e for e in v['erank']]; ta=v['test_acc']
+ax.plot(ep, inv, color='#888888', linewidth=1.5, label='140 - erank')
+ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc')
+ax.set_title('wd too low (wd=0.5): no compression');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
 ax.set_ylim(-5,145);ax.grid(True,alpha=0.2);ax.legend(fontsize=8)
-ax.annotate('erank flat\n-> stuck',xy=(1200,18),fontsize=10,color='#666',
-            bbox=dict(boxstyle='round',facecolor='#ffeeee',alpha=0.8))
+# Regime 2: arc
 ax=axes[1]
-v=d1['2.0'];inv=[140-e for e in v['erank']]
-ax.plot(v['epoch'],inv,color='#ff8800',linewidth=2.0,label='wd=2.0')
-ax.set_title('wd just right: arc -> stop at dip');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
+v=d1['2.0']; ep=v['epoch']; inv=[140-e for e in v['erank']]; ta=v['test_acc']
+ax.plot(ep, inv, color='#ff8800', linewidth=2.0, label='140 - erank')
+ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc')
+ax.set_title('wd just right (wd=2.0): arc - stop at dip');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
 ax.set_ylim(-5,145);ax.grid(True,alpha=0.2);ax.legend(fontsize=9)
 mi=v['erank'].index(min(v['erank']))
-ax.annotate('STOP HERE',xy=(v['epoch'][mi],140-v['erank'][mi]),
-            xytext=(v['epoch'][mi]+200,140-v['erank'][mi]-25),
-            arrowprops=dict(arrowstyle='->',color='#ff8800',lw=2),fontsize=11,fontweight='bold',
-            color='#cc6600',bbox=dict(boxstyle='round',facecolor='#ffffcc',alpha=0.9))
+ax.annotate('STOP HERE', xy=(v['epoch'][mi], 140 - v['erank'][mi]),
+            xytext=(v['epoch'][mi]+200, 140 - v['erank'][mi] - 25),
+            arrowprops=dict(arrowstyle='->', color='#ff8800', lw=2), fontsize=11, fontweight='bold',
+            color='#cc6600', bbox=dict(boxstyle='round', facecolor='#ffffcc', alpha=0.9))
+# Regime 3: collapse
 ax=axes[2]
-v=d2['3.0'];inv=[140-e for e in v['erank']]
-ax.plot(v['epoch'],inv,color='#cc4444',linewidth=2.0,label='wd=3.0')
-ax.set_title('wd too high: collapse');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
+v=d2['3.0']; ep=v['epoch']; inv=[140-e for e in v['erank']]; ta=v['test_acc']
+ax.plot(ep, inv, color='#cc4444', linewidth=2.0, label='140 - erank')
+ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc')
+ax.set_title('wd too high (wd=3.0): collapse');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
 ax.set_ylim(-5,145);ax.grid(True,alpha=0.2);ax.legend(fontsize=9)
-ax.annotate('erank = 0\n-> dead',xy=(1200,8),fontsize=10,color='#c44',
-            bbox=dict(boxstyle='round',facecolor='#ffeeee',alpha=0.8))
-plt.suptitle('Fig 5: Practical Guide — Using erank to Diagnose Weight Decay',y=1.02,fontsize=12)
-plt.tight_layout();plt.savefig(f'{OUT}/fig5_wd_regimes.png',dpi=150);plt.close()
+plt.suptitle('Fig 5: Practical Guide - Using erank to Diagnose Weight Decay', y=1.02, fontsize=12)
+plt.tight_layout();plt.savefig(f'{OUT}/fig5_wd_regimes.png', dpi=150);plt.close()
 print('Done:', OUT)

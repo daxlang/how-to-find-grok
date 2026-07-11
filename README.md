@@ -62,7 +62,7 @@ erank = torch.exp(-(p := S/S.sum() * torch.log(p+1e-10)).sum()).item()
 
 ![wd vs noise](figures/fig3_wd_vs_noise.png?v=3)
 
-左图：最优 wd 从 noise=0 时的 0.3 飙升到 noise=20% 时的 2.15。右图：峰值准确率从 100% 降至 95%，噪声=40% 时完全无法 grok。
+左图：可泛化的 wd 从 noise=0 时的 0.3 飙升到 noise=20% 时的 2.15。右图：峰值准确率从 100% 降至 95%，噪声=40% 时完全无法 grok。
 
 ### 4. 固定 wd=0.5 在噪声增大时迅速失效
 
