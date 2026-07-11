@@ -1,30 +1,59 @@
-"""Generate all figures — English labels for font compatibility."""
+"""FIG 1: All wd values — noise=0 and noise=0.1 — erank inverted + accuracy."""
 import json, matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
 DATA = 'data'; OUT = 'figures'
-plt.rcParams.update({'font.size': 11, 'axes.titlesize': 12, 'axes.labelsize': 10})
+plt.rcParams.update({'font.size': 10, 'axes.titlesize': 11, 'axes.labelsize': 9})
 
 def load(fn):
     with open(f'{DATA}/{fn}') as f: return json.load(f)
 
-# ============================================================
-# FIG 1: Grokking — wd=0.5 vs wd=0.0, erank INVERTED
-# ============================================================
-d = load('grokking_trajectory.json')
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.5))
-for ax, key, title in [(ax1, 'wd_0.5', 'Grokking (wd=0.5)'), (ax2, 'wd_0.0', 'Memorization (wd=0.0)')]:
-    v = d[key]; ep = v['epoch']; ea = [140 - e for e in v['erank']]; ta = v['test_acc']
-    ax.plot(ep, ea, 'b-', linewidth=1.2, label='140 - erank (inverted)')
-    ax.plot(ep, [t*140 for t in ta], 'r-', linewidth=1.5, alpha=0.6, label='Test Acc x140')
-    ax.set_ylim(0, 145)
-    ax.set_xlabel('Epoch'); ax.set_ylabel('Score')
-    ax.set_title(title); ax.grid(True, alpha=0.2)
-    ax.legend(fontsize=8, loc='lower right')
-plt.suptitle('Fig 1: Grokking Trajectory (p=97, dim=128, 20000 epochs)', y=1.02)
-plt.tight_layout(); plt.savefig(f'{OUT}/fig1_grokking.png', dpi=150); plt.close()
+# Panel data: (title, filename, wd_list)
+panels = [
+    # noise=0 — grokking trajectory (only wd=0.0 and 0.5 available)
+    ('noise=0%, wd=0.5', 'grokking_trajectory.json', ['wd_0.5'], True),
+    ('noise=0%, wd=0.0', 'grokking_trajectory.json', ['wd_0.0'], True),
+    # noise=0.1 — all wd from arc discovery
+    ('noise=10%, wd=0.1-3.0', 'arc_discovery_noise01.json', None, False),
+]
+
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+for idx, (title, fn, wd_keys, is_single) in enumerate(panels):
+    ax = axes[idx]
+    if is_single:
+        v = load(fn)[wd_keys[0]]
+        ep = v['epoch']; ea = v['erank']; ta = v['test_acc']
+        inv = [140 - e for e in ea]
+        ax.plot(ep, inv, 'b-', linewidth=1.5, label='140 - erank')
+        ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc x140')
+        # annotate endpoints
+        ax.annotate(f'{inv[0]:.0f}', xy=(ep[0], inv[0]), fontsize=8, color='b')
+        ax.annotate(f'{inv[-1]:.0f}', xy=(ep[-1], inv[-1]), fontsize=8, color='b',
+                    xytext=(ep[-1]-800, inv[-1]+5))
+    else:
+        d2 = load(fn)
+        cmap = plt.cm.tab10
+        for i, k in enumerate(sorted(d2.keys(), key=float)):
+            v = d2[k]; wd = float(k); ep = v['epoch']; ea = v['erank']
+            inv = [140 - e for e in ea]
+            c = cmap(i % 10)
+            lw = 1.8 if wd in [2.0, 2.2] else 0.7
+            alpha = 0.9 if wd in [2.0, 2.2] else 0.35
+            ax.plot(ep, inv, color=c, linewidth=lw, alpha=alpha, label=f'wd={wd:.1f}')
+        # highlight arc region
+        ax.axvspan(400, 1000, alpha=0.06, color='orange')
+        ax.text(700, 10, 'arc region', fontsize=8, color='orange', ha='center')
+        ax.legend(fontsize=6, ncol=2, loc='lower right')
+
+    ax.set_title(title); ax.set_xlabel('Epoch'); ax.set_ylabel('Score')
+    ax.set_ylim(-5, 145); ax.grid(True, alpha=0.2)
+
+plt.suptitle('Fig 1: erank tracks grokking across all weight decay values (blue=140-erank, red=accuracy)',
+             y=1.02, fontsize=12)
+plt.tight_layout(); plt.savefig(f'{OUT}/fig1_all_wd.png', dpi=150); plt.close()
 
 # ============================================================
 # FIG 2: Universality across noise levels
@@ -51,8 +80,7 @@ for idx, (title, fn, wd_key, is_grok) in enumerate(configs):
             elif wd > 2.5: c, lw, alpha = '#cc4444', 0.5, 0.35
             elif 2.0 <= wd <= 2.2: c, lw, alpha = '#ff8800', 1.8, 0.9
             else: c, lw, alpha = '#888888', 0.8, 0.45
-            ax.plot(v['epoch'], v['erank'], color=c, linewidth=lw, alpha=alpha,
-                    label=f'wd={wd:.1f}' if wd in [0.5, 2.0, 3.0] else None)
+            ax.plot(v['epoch'], v['erank'], color=c, linewidth=lw, alpha=alpha)
         from matplotlib.lines import Line2D
         custom = [Line2D([0],[0],color='#aaaaaa',lw=1,label='wd too low'),
                   Line2D([0],[0],color='#ff8800',lw=2,label='arc region'),
@@ -88,7 +116,7 @@ plt.suptitle('Fig 3: Noise Scan (p=97, dim=128, wd=0.5, 2000e)', y=1.02)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig3_noise.png', dpi=150); plt.close()
 
 # ============================================================
-# FIG 4: Arc detail — noise=0.1 with annotations
+# FIG 4: Arc detail
 # ============================================================
 d = load('arc_discovery_noise01.json')
 fig, ax = plt.subplots(figsize=(9, 5))
