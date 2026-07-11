@@ -121,4 +121,38 @@ for idx, (title, v) in enumerate(panels):
                     bbox=dict(boxstyle='round', facecolor='#ffffcc', alpha=0.9))
 plt.suptitle('Fig 5: Practical Guide - Three Regimes at Two Noise Levels', y=1.01, fontsize=12)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig5_wd_regimes.png', dpi=150); plt.close()
+
+# ============================================================
+# FIG 6: Full wd scan for noise=10% — demonstrating the wd window
+# ============================================================
+d01 = load('arc_discovery_noise01.json')  # wd=0.1 to 2.0
+d01h = load('arc_high_wd_noise01.json')   # wd=2.0, 3.0, 5.0
+# Combine all wd values
+all_wd = {}
+for k, v in d01.items(): all_wd[float(k)] = v
+for k, v in d01h.items():
+    if float(k) not in all_wd: all_wd[float(k)] = v
+
+wd_sorted = sorted(all_wd.keys())
+n = len(wd_sorted)
+cols = 4
+rows = (n + cols - 1) // cols
+fig, axes = plt.subplots(rows, cols, figsize=(18, 4 * rows))
+axes = axes.flatten()
+
+for idx, wd in enumerate(wd_sorted):
+    ax = axes[idx]
+    v = all_wd[wd]; ep = v['epoch']; er = v['erank']; ac = v['test_acc']
+    # Color code: gray=stuck, orange=arc, red=collapse
+    if wd < 1.5: clr = '#888888'
+    elif wd >= 5.0: clr = '#cc4444'
+    elif 2.0 <= wd <= 2.2: clr = '#ff8800'
+    else: clr = '#999999'
+    plot_erank_acc(ax, ep, er, ac, f'noise=10%, wd={wd:.1f}')
+    if 2.0 <= wd <= 2.2:
+        ax.patch.set_facecolor('#fff8e1')
+for idx in range(len(wd_sorted), len(axes)):
+    axes[idx].set_visible(False)
+plt.suptitle('Fig 6: Full wd Scan — noise=10%, p=97, dim=128 (orange=arc window)', y=1.01, fontsize=12)
+plt.tight_layout(); plt.savefig(f'{OUT}/fig6_wd_window.png', dpi=150); plt.close()
 print('Done:', OUT)
