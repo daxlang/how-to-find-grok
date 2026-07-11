@@ -91,25 +91,34 @@ plt.suptitle('Fig 4: Same wd=0.5 Fails at Higher Noise', y=1.02, fontsize=12)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig4_noise_wd05.png', dpi=150); plt.close()
 
 # ============================================================
-# FIG 5: Three regimes
+# FIG 5: Three regimes x two noise levels
 # ============================================================
-d1 = load('arc_discovery_noise01.json')
-d2 = load('arc_high_wd_noise01.json')
-fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
-for ax, title, v in [
-    (axes[0], 'wd too low (wd=0.5): no compression', d1['0.5']),
-    (axes[1], 'wd just right (wd=2.0): arc - stop at dip', d1['2.0']),
-    (axes[2], 'wd too high (wd=3.0): collapse', d2['3.0']),
-]:
+d01 = load('arc_discovery_noise01.json')   # noise=10%
+d01h = load('arc_high_wd_noise01.json')    # noise=10% high wd
+d02 = load('arc_window_noise02.json')      # noise=20%
+d02h = load('arc_broad_noise02.json')      # noise=20% broad
+
+panels = [
+    ('noise=10%, wd=0.5 (too low)', d01['0.5']),
+    ('noise=10%, wd=2.0 (arc!)', d01['2.0']),
+    ('noise=10%, wd=3.0 (collapse)', d01h['3.0']),
+    ('noise=20%, wd=1.5 (too low)', d02h['1.5']),
+    ('noise=20%, wd=2.2 (arc!)', d02['2.2']),
+    ('noise=20%, wd=3.0 (collapse)', d02['3.0']),
+]
+
+fig, axes = plt.subplots(2, 3, figsize=(16, 8))
+for idx, (title, v) in enumerate(panels):
+    ax = axes[idx // 3][idx % 3]
     ep = v['epoch']; er = v['erank']; ac = v['test_acc']
     a1, a2 = plot_erank_acc(ax, ep, er, ac, title)
-    if 'stop' in title:
+    if 'arc!' in title:
         mi = er.index(min(er))
-        a1.annotate('STOP HERE', xy=(ep[mi], 140 - er[mi]),
-                    xytext=(ep[mi]+200, 140 - er[mi] - 25),
+        a1.annotate('STOP', xy=(ep[mi], 140 - er[mi]),
+                    xytext=(ep[mi]+150, 140 - er[mi] - 20),
                     arrowprops=dict(arrowstyle='->', color='#ff8800', lw=2),
-                    fontsize=11, fontweight='bold', color='#cc6600',
+                    fontsize=9, fontweight='bold', color='#cc6600',
                     bbox=dict(boxstyle='round', facecolor='#ffffcc', alpha=0.9))
-plt.suptitle('Fig 5: Practical Guide - Using erank to Diagnose Weight Decay', y=1.02, fontsize=12)
+plt.suptitle('Fig 5: Practical Guide - Three Regimes at Two Noise Levels', y=1.01, fontsize=12)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig5_wd_regimes.png', dpi=150); plt.close()
 print('Done:', OUT)
