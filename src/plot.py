@@ -1,4 +1,4 @@
-"""Generate all figures v6 — single best-wd per noise, wd-vs-noise phase diagram."""
+"""Generate all figures — dual y-axis for all erank+acc plots."""
 import json, matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -10,147 +10,106 @@ plt.rcParams.update({'font.size': 10, 'axes.titlesize': 11, 'axes.labelsize': 9}
 def load(fn):
     with open(f'{DATA}/{fn}') as f: return json.load(f)
 
+def plot_erank_acc(ax, ep, erank, acc, title, xlabel='Epoch'):
+    inv = [140 - e for e in erank]
+    ax.plot(ep, inv, 'b-', linewidth=1.5, label='140 - erank (compress)')
+    ax.set_ylabel('140 - erank', color='b'); ax.set_ylim(-5, 145)
+    ax2 = ax.twinx()
+    ax2.plot(ep, acc, 'r-', linewidth=1.2, label='Test Accuracy')
+    ax2.set_ylabel('Test Accuracy', color='r'); ax2.set_ylim(0, 1.05)
+    ax.set_title(title); ax.set_xlabel(xlabel); ax.grid(True, alpha=0.2)
+    l1, lab1 = ax.get_legend_handles_labels()
+    l2, lab2 = ax2.get_legend_handles_labels()
+    ax.legend(l1 + l2, lab1 + lab2, fontsize=7, loc='lower right')
+    return ax, ax2
+
 # ============================================================
-# FIG 1: noise=0 grokking vs memorization
+# FIG 1: Grokking vs memorization
 # ============================================================
-panels = [
-    ('noise=0%, wd=0.5 (grokking)', 'grokking_trajectory.json', 'wd_0.5'),
-    ('noise=0%, wd=0.0 (memorization)', 'grokking_trajectory.json', 'wd_0.0'),
-]
+d = load('grokking_trajectory.json')
 fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
-for idx, (title, fn, wd_key) in enumerate(panels):
-    ax = axes[idx]
-    v = load(fn)[wd_key]; ep = v['epoch']; ta = v['test_acc']
-    inv = [140 - e for e in v['erank']]
-    ax.plot(ep, inv, 'b-', linewidth=1.5, label='140 - erank')
-    ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc x140')
-    ax.set_title(title); ax.set_xlabel('Epoch'); ax.set_ylabel('Score')
-    ax.set_ylim(-5, 145); ax.grid(True, alpha=0.2); ax.legend(fontsize=8)
-plt.suptitle('Fig 1: erank tracks grokking (p=97, dim=128, 20000 epochs)', y=1.02, fontsize=12)
+plot_erank_acc(axes[0], d['wd_0.5']['epoch'], d['wd_0.5']['erank'],
+               d['wd_0.5']['test_acc'], 'noise=0, wd=0.5 (grokking)')
+plot_erank_acc(axes[1], d['wd_0.0']['epoch'], d['wd_0.0']['erank'],
+               d['wd_0.0']['test_acc'], 'noise=0, wd=0.0 (memorization)')
+plt.suptitle('Fig 1: erank = Grokking Detector (p=97, dim=128, 20000e)', y=1.02, fontsize=12)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig1_grokking.png', dpi=150); plt.close()
 
 # ============================================================
-# FIG 2: Best wd per noise level — inverted erank + accuracy
+# FIG 2: Best wd per noise
 # ============================================================
-# Data: (noise_label, source_file, wd_key)
-best_per_noise = [
-    ('noise=0%', 'grokking_trajectory.json', 'wd_0.5', None),
-    ('noise=10%', 'arc_discovery_noise01.json', '2.0', None),
-    ('noise=20%', 'arc_optimal_noise02.json', '2.15', None),
+best = [
+    ('noise=0%, wd=0.5', 'grokking_trajectory.json', 'wd_0.5', ''),
+    ('noise=10%, wd=2.0', 'arc_discovery_noise01.json', '2.0', ''),
+    ('noise=20%, wd=2.15', 'arc_optimal_noise02.json', '2.15', ''),
     ('noise=40%', 'arc_noise04_closed.json', '2.0', '(no grokking)'),
 ]
 fig, axes = plt.subplots(1, 4, figsize=(18, 4.2))
-for idx, (title, fn, wd_key, note) in enumerate(best_per_noise):
-    ax = axes[idx]; v = load(fn)
-    if wd_key in v:
-        vv = v[wd_key]
-    else:
-        # grokking_trajectory special case
-        vv = v[wd_key]
-    ep = vv['epoch']; ta = vv['test_acc']
-    inv = [140 - e for e in vv['erank']]
-    ax.plot(ep, inv, 'b-', linewidth=1.5, label='140 - erank')
-    ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc')
-    ax.set_title(f'{title}, best wd={wd_key} {note or ""}')
-    ax.set_xlabel('Epoch'); ax.set_ylabel('140 - erank')
-    ax.set_ylim(-5, 145); ax.grid(True, alpha=0.2)
-    # annotate final values
-    ax.annotate(f'erank={vv["erank"][-1]:.0f}\nacc={ta[-1]:.0%}', xy=(0.98, 0.95),
-                xycoords='axes fraction', fontsize=8, ha='right', va='top',
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-plt.suptitle('Fig 2: Best Weight Decay per Noise Level', y=1.02, fontsize=12)
+for idx, (title, fn, key, note) in enumerate(best):
+    v = load(fn)
+    vv = v[key]
+    ep = vv['epoch']; er = vv['erank']; ac = vv['test_acc']
+    ax, _ = plot_erank_acc(axes[idx], ep, er, ac, f'{title}, wd={key} {note}')
+plt.suptitle('Fig 2: Can-Grok Wd per Noise Level', y=1.02, fontsize=12)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig2_best_wd.png', dpi=150); plt.close()
 
 # ============================================================
-# FIG 3: Optimal wd shifts with noise
+# FIG 3: wd-vs-noise bar chart
 # ============================================================
-# Hardcoded from experiments:
-# noise=0%: best wd=0.3, peak acc=100%, final erank=45.6
-# noise=10%: best wd=2.0, peak acc=94.7%, final erank=93
-# noise=20%: best wd=2.15, peak acc=94.7%, final erank=93
-# noise=40%: no grokking
 noises = [0.0, 0.1, 0.2, 0.4]
 opt_wd = [0.3, 2.0, 2.15, None]
 peak_acc = [1.0, 0.947, 0.947, None]
-final_erank = [46, 93, 93, None]
-
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
-# left: optimal wd vs noise
-bars = ax1.bar(range(3), opt_wd[:3], color=['#2ca02c', '#ff7f0e', '#d62728'], alpha=0.8)
+ax1.bar(range(3), opt_wd[:3], color=['#2ca02c', '#ff7f0e', '#d62728'], alpha=0.8)
 ax1.set_xticks(range(3)); ax1.set_xticklabels(['0%', '10%', '20%'])
-ax1.set_xlabel('Label Noise'); ax1.set_ylabel('Optimal Weight Decay')
-ax1.set_title('Optimal wd vs Noise')
-for i, w in enumerate(opt_wd[:3]):
-    ax1.text(i, w+0.05, f'wd={w}', ha='center', fontsize=11, fontweight='bold')
-ax1.axhline(y=0, color='gray', linewidth=0.5); ax1.grid(True, alpha=0.2)
-ax1.annotate('noise=40%:\nno grokking\nat any wd', xy=(3, 1.5), fontsize=9, color='#888',
-             ha='center', bbox=dict(boxstyle='round', facecolor='#ffeeee', alpha=0.7))
-
-# right: peak accuracy at optimal wd
-colors = []
-for a in peak_acc[:3]:
-    colors.append('#2ca02c' if a and a > 0.9 else '#d62728')
-ax2.bar(range(3), [a if a else 0 for a in peak_acc[:3]], color=colors, alpha=0.8)
+ax1.set_xlabel('Label Noise'); ax1.set_ylabel('Wd that can Grok')
+ax1.set_title('Required Wd vs Noise')
+for i, w in enumerate(opt_wd[:3]): ax1.text(i, w+0.05, f'{w}', ha='center', fontsize=11, fontweight='bold')
+ax1.grid(True, alpha=0.2)
+ax1.annotate('noise=40%:\nno grokking', xy=(3, 1.5), fontsize=9, ha='center', color='#888',
+             bbox=dict(boxstyle='round', facecolor='#ffeeee', alpha=0.7))
+cs = ['#2ca02c' if a and a>0.9 else '#d62728' for a in peak_acc[:3]]
+ax2.bar(range(3), [a or 0 for a in peak_acc[:3]], color=cs, alpha=0.8)
 ax2.set_xticks(range(3)); ax2.set_xticklabels(['0%', '10%', '20%'])
 ax2.set_xlabel('Label Noise'); ax2.set_ylabel('Peak Accuracy'); ax2.set_ylim(0, 1.1)
-ax2.set_title('Peak Accuracy at Optimal wd')
+ax2.set_title('Peak Accuracy at Grokking Wd')
 for i, a in enumerate(peak_acc[:3]):
     if a: ax2.text(i, a+0.03, f'{a:.1%}', ha='center', fontsize=11, fontweight='bold')
 ax2.grid(True, alpha=0.2)
-plt.suptitle('Fig 3: Optimal wd Increases with Noise, Accuracy Eventually Falls', y=1.02, fontsize=12)
+plt.suptitle('Fig 3: Wd Required for Grokking Rises with Noise', y=1.02, fontsize=12)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig3_wd_vs_noise.png', dpi=150); plt.close()
 
 # ============================================================
-# FIG 4: Same wd across noise levels
+# FIG 4: Same wd=0.5 across noise
 # ============================================================
-# Compare wd=0.5 across noise=0/0.1/0.2/0.4 from noise_scan.json
 v = load('noise_scan.json')
 fig, axes = plt.subplots(1, 4, figsize=(18, 4.2))
 for idx, n in enumerate(['0.0', '0.1', '0.2', '0.4']):
-    ax = axes[idx]; vv = v[n]; ep = vv['epoch']; ta = vv['test_acc']
-    inv = [140 - e for e in vv['erank']]
-    ax.plot(ep, inv, 'b-', linewidth=1.5, label='140 - erank')
-    ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc')
-    ax.set_title(f'noise={float(n):.0%}, wd=0.5'); ax.set_xlabel('Epoch'); ax.set_ylabel('140 - erank')
-    ax.set_ylim(-5, 145); ax.grid(True, alpha=0.2)
-    ax.annotate(f'erank={vv["erank"][-1]:.0f}\nacc={ta[-1]:.0%}', xy=(0.98, 0.95),
-                xycoords='axes fraction', fontsize=8, ha='right', va='top',
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    vv = v[n]; ep = vv['epoch']; er = vv['erank']; ac = vv['test_acc']
+    plot_erank_acc(axes[idx], ep, er, ac, f'noise={float(n):.0%}, wd=0.5')
 plt.suptitle('Fig 4: Same wd=0.5 Fails at Higher Noise', y=1.02, fontsize=12)
 plt.tight_layout(); plt.savefig(f'{OUT}/fig4_noise_wd05.png', dpi=150); plt.close()
 
 # ============================================================
-# FIG 5: Three wd regimes — with accuracy overlay
+# FIG 5: Three regimes
 # ============================================================
 d1 = load('arc_discovery_noise01.json')
 d2 = load('arc_high_wd_noise01.json')
 fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
-# Regime 1: too low
-ax=axes[0]
-v=d1['0.5']; ep=v['epoch']; inv=[140-e for e in v['erank']]; ta=v['test_acc']
-ax.plot(ep, inv, color='#888888', linewidth=1.5, label='140 - erank')
-ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc')
-ax.set_title('wd too low (wd=0.5): no compression');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
-ax.set_ylim(-5,145);ax.grid(True,alpha=0.2);ax.legend(fontsize=8)
-# Regime 2: arc
-ax=axes[1]
-v=d1['2.0']; ep=v['epoch']; inv=[140-e for e in v['erank']]; ta=v['test_acc']
-ax.plot(ep, inv, color='#ff8800', linewidth=2.0, label='140 - erank')
-ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc')
-ax.set_title('wd just right (wd=2.0): arc - stop at dip');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
-ax.set_ylim(-5,145);ax.grid(True,alpha=0.2);ax.legend(fontsize=9)
-mi=v['erank'].index(min(v['erank']))
-ax.annotate('STOP HERE', xy=(v['epoch'][mi], 140 - v['erank'][mi]),
-            xytext=(v['epoch'][mi]+200, 140 - v['erank'][mi] - 25),
-            arrowprops=dict(arrowstyle='->', color='#ff8800', lw=2), fontsize=11, fontweight='bold',
-            color='#cc6600', bbox=dict(boxstyle='round', facecolor='#ffffcc', alpha=0.9))
-# Regime 3: collapse
-ax=axes[2]
-v=d2['3.0']; ep=v['epoch']; inv=[140-e for e in v['erank']]; ta=v['test_acc']
-ax.plot(ep, inv, color='#cc4444', linewidth=2.0, label='140 - erank')
-ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc')
-ax.set_title('wd too high (wd=3.0): collapse');ax.set_xlabel('Epoch');ax.set_ylabel('140 - erank')
-ax.set_ylim(-5,145);ax.grid(True,alpha=0.2);ax.legend(fontsize=9)
+for ax, title, v in [
+    (axes[0], 'wd too low (wd=0.5): no compression', d1['0.5']),
+    (axes[1], 'wd just right (wd=2.0): arc - stop at dip', d1['2.0']),
+    (axes[2], 'wd too high (wd=3.0): collapse', d2['3.0']),
+]:
+    ep = v['epoch']; er = v['erank']; ac = v['test_acc']
+    a1, a2 = plot_erank_acc(ax, ep, er, ac, title)
+    if 'stop' in title:
+        mi = er.index(min(er))
+        a1.annotate('STOP HERE', xy=(ep[mi], 140 - er[mi]),
+                    xytext=(ep[mi]+200, 140 - er[mi] - 25),
+                    arrowprops=dict(arrowstyle='->', color='#ff8800', lw=2),
+                    fontsize=11, fontweight='bold', color='#cc6600',
+                    bbox=dict(boxstyle='round', facecolor='#ffffcc', alpha=0.9))
 plt.suptitle('Fig 5: Practical Guide - Using erank to Diagnose Weight Decay', y=1.02, fontsize=12)
-plt.tight_layout();plt.savefig(f'{OUT}/fig5_wd_regimes.png', dpi=150);plt.close()
+plt.tight_layout(); plt.savefig(f'{OUT}/fig5_wd_regimes.png', dpi=150); plt.close()
 print('Done:', OUT)
