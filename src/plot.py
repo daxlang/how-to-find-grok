@@ -101,7 +101,7 @@ d02h = load('arc_broad_noise02.json')      # noise=20% broad
 panels = [
     ('noise=10%, wd=0.5 (too low)', d01['0.5']),
     ('noise=10%, wd=2.0 (arc!)', d01['2.0']),
-    ('noise=10%, wd=3.0 (collapse)', d01h['3.0']),
+    ('noise=10%, wd=5.0 (collapse)', d01h['5.0']),
     ('noise=20%, wd=1.5 (too low)', d02h['1.5']),
     ('noise=20%, wd=2.2 (arc!)', d02['2.2']),
     ('noise=20%, wd=3.0 (collapse)', d02['3.0']),
