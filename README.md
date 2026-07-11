@@ -51,13 +51,13 @@ erank = torch.exp(-(p := S/S.sum() * torch.log(p+1e-10)).sum()).item()
 
 ### 1. 有 weight decay 才顿悟，无则不泛化
 
-![grokking](figures/fig1_grokking.png)
+![grokking](figures/fig1_grokking.png?v=3)
 
 蓝线 = 140 - erank（反转，越高表示越压缩），红线 = 测试准确率 × 140。左图：wd=0.5 下，两条曲线同步上升——erank 从 138 骤降到 60（反转后从 2 升到 80），测试准确率同时从 2% 跳到 100%。右图：wd=0.0 下，两条线都纹丝不动。
 
 ### 2. 弧形是普适现象
 
-![universality](figures/fig2_universality.png)
+![universality](figures/fig2_universality.png?v=3)
 
 四张子图，同一任务、同一架构、同一指标。橙线 = 弧形区间：
 
@@ -72,13 +72,13 @@ erank = torch.exp(-(p := S/S.sum() * torch.log(p+1e-10)).sum()).item()
 
 ### 3. 噪声越高，压缩越难
 
-![noise](figures/fig3_noise.png)
+![noise](figures/fig3_noise.png?v=3)
 
 噪声=0% 时 erank 降为 59（高度压缩），噪声=10% 时停在 119，噪声≥20% 时完全无法 grok。
 
 ### 4. 弧底 = 最佳泛化点
 
-![arc](figures/fig4_arc_detail.png)
+![arc](figures/fig4_arc_detail.png?v=3)
 
 noise=10% 下三条典型曲线对比：wd=1.5 无弧（压缩不足），wd=2.0 出现清晰弧形（弧底 erank=99, acc=86%），wd=3.0 直接塌死。弧底是模型最紧凑、泛化最好的瞬间——早停信号。
 
