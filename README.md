@@ -39,12 +39,9 @@ erank = torch.exp(-(p := S/S.sum() * torch.log(p+1e-10)).sum()).item()
 
 ### 1. erank 忠实追踪每一次 Grokking
 
-![all wd](figures/fig1_all_wd.png?v=3)
+![grokking](figures/fig1_grokking.png?v=3)
 
-蓝线 = 140 - erank（越高 = 越压缩），红虚线 = 准确率。三张图覆盖 noise=0 和 noise=10% 下的所有 wd：
-- **左**：noise=0, wd=0.5。erank 从 138→60（反转后 2→80），准确率 2%→100%。两条曲线几乎重合。
-- **中**：noise=0, wd=0.0。erank 纹丝不动——模型从未压缩，准确率永远 50%（随机）。
-- **右**：noise=10%，扫 wd=0.1 到 2.0。wd<1.5 不压缩（灰色），wd=2.0 出现清晰弧形（橙色高亮），erank 在弧底最大化。**无论 wd 怎么变，erank 的轨迹忠实反映了泛化程度。噪声=0 时也存在微弱弧形（见 Fig 2 最左），噪声=10% 时弧形最深。**
+蓝线 = 140 - erank（越高 = 越压缩），红虚线 = 准确率。**左**：wd=0.5 下 erank 从 138→60（反转后 2→80），准确率 2%→100%，两条曲线几乎重合。**右**：wd=0.0 下 erank 纹丝不动——模型从未压缩，准确率永远 50%。
 
 ### 2. 不同噪声下的最优 Weight Decay
 

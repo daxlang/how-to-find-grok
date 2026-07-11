@@ -11,35 +11,23 @@ def load(fn):
     with open(f'{DATA}/{fn}') as f: return json.load(f)
 
 # ============================================================
-# FIG 1: All wd — noise=0 and noise=0.1, inverted erank
+# FIG 1: noise=0 grokking vs memorization
 # ============================================================
 panels = [
-    ('noise=0%, wd=0.5', 'grokking_trajectory.json', ['wd_0.5'], True),
-    ('noise=0%, wd=0.0', 'grokking_trajectory.json', ['wd_0.0'], True),
-    ('noise=10%, wd=0.1-2.0', 'arc_discovery_noise01.json', None, False),
+    ('noise=0%, wd=0.5 (grokking)', 'grokking_trajectory.json', 'wd_0.5'),
+    ('noise=0%, wd=0.0 (memorization)', 'grokking_trajectory.json', 'wd_0.0'),
 ]
-fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-for idx, (title, fn, wd_keys, is_single) in enumerate(panels):
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+for idx, (title, fn, wd_key) in enumerate(panels):
     ax = axes[idx]
-    if is_single:
-        v = load(fn)[wd_keys[0]]; ep = v['epoch']; ta = v['test_acc']
-        inv = [140 - e for e in v['erank']]
-        ax.plot(ep, inv, 'b-', linewidth=1.5, label='140 - erank')
-        ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc x140')
-    else:
-        d2 = load(fn); cmap = plt.cm.tab10
-        for i, k in enumerate(sorted(d2.keys(), key=float)):
-            v = d2[k]; wd = float(k)
-            inv = [140 - e for e in v['erank']]
-            c = cmap(i%10); lw = 1.8 if wd in [2.0,2.2] else 0.7
-            alpha = 0.9 if wd in [2.0,2.2] else 0.3
-            ax.plot(v['epoch'], inv, color=c, linewidth=lw, alpha=alpha, label=f'wd={wd:.1f}')
-        ax.axvspan(400, 1000, alpha=0.06, color='orange')
-        ax.legend(fontsize=6, ncol=2, loc='lower right')
-    ax.set_title(title); ax.set_xlabel('Epoch'); ax.set_ylabel('140 - erank')
-    ax.set_ylim(-5, 145); ax.grid(True, alpha=0.2)
-plt.suptitle('Fig 1: erank tracks grokking across all weight decay values', y=1.02, fontsize=12)
-plt.tight_layout(); plt.savefig(f'{OUT}/fig1_all_wd.png', dpi=150); plt.close()
+    v = load(fn)[wd_key]; ep = v['epoch']; ta = v['test_acc']
+    inv = [140 - e for e in v['erank']]
+    ax.plot(ep, inv, 'b-', linewidth=1.5, label='140 - erank')
+    ax.plot(ep, [t*140 for t in ta], 'r--', linewidth=1.2, alpha=0.5, label='Acc x140')
+    ax.set_title(title); ax.set_xlabel('Epoch'); ax.set_ylabel('Score')
+    ax.set_ylim(-5, 145); ax.grid(True, alpha=0.2); ax.legend(fontsize=8)
+plt.suptitle('Fig 1: erank tracks grokking (p=97, dim=128, 20000 epochs)', y=1.02, fontsize=12)
+plt.tight_layout(); plt.savefig(f'{OUT}/fig1_grokking.png', dpi=150); plt.close()
 
 # ============================================================
 # FIG 2: Best wd per noise level — inverted erank + accuracy
